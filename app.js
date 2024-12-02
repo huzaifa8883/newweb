@@ -187,6 +187,58 @@ app.post('/update-order-status', async (req, res) => {
       return res.status(404).json({ message: 'Order not found.' });
     }
 
+    // If the payment status is updated to 'completed', send an email
+    if (paymentStatus.toLowerCase() === 'completed') {
+      // Prepare email details
+      const productDetails = order.products
+        .map(
+          (product) =>
+            `<p><strong>${product.packageName}</strong>: $${product.packagePrice} x ${product.quantity}</p>`
+        )
+        .join('');
+      const totalPrice = order.products.reduce(
+        (total, product) => total + product.packagePrice * product.quantity,
+        0
+      );
+
+      const emailMessage = {
+        text: `Thank you for your order!\n\nOrder Details:\n${order.products
+          .map(
+            (product) =>
+              `${product.packageName}: $${product.packagePrice} x ${product.quantity}`
+          )
+          .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(
+          2
+        )}\nPayment Method: PayPal`,
+        from: process.env.EMAIL_USER,
+        to: order.email,
+        subject: 'Payment Completed: Thank You for Your Order!',
+        attachment: [
+          {
+            data: `
+                <h2>Thank you for your order!</h2>
+                <p>Order Details:</p>
+                ${productDetails}
+                <p><strong>Total Price: $${totalPrice.toFixed(
+                  2
+                )}</strong></p>
+                <p><strong>Payment Method: PayPal</strong></p>
+            `,
+            alternative: true,
+          },
+        ],
+      };
+
+      // Send the email using emailjs
+      client.send(emailMessage, (err, message) => {
+        if (err) {
+          console.error('Error sending email:', err);
+        } else {
+          console.log('Email sent successfully:', message);
+        }
+      });
+    }
+
     // Update the payment status
     order.paymentStatus = paymentStatus;
 
@@ -195,16 +247,92 @@ app.post('/update-order-status', async (req, res) => {
 
     res.json({
       message: `Order status updated to ${paymentStatus}`,
-      orderDetails: order
+      orderDetails: order,
     });
   } catch (err) {
     console.error('Error updating order status:', err);
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
+
 app.get('/', (req, res) => {
   res.json({ message: 'Server is running!' });
 });
+// Route to update the payment status of an order to "completed"
+app.post('/complete-order', async (req, res) => {
+  const { orderId } = req.body;
+
+  if (!orderId) {
+    return res.status(400).json({ message: 'Order ID is required' });
+  }
+
+  try {
+    // Find the order by ID
+    const order = await Order.findById(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Update the payment status to "completed"
+    order.paymentStatus = 'completed';
+
+    // Save the updated order
+    await order.save();
+
+    // Prepare email details
+    const productDetails = order.products
+      .map(
+        (product) =>
+          `<p><strong>${product.packageName}</strong>: $${product.packagePrice} x ${product.quantity}</p>`
+      )
+      .join('');
+    const totalPrice = order.products.reduce(
+      (total, product) => total + product.packagePrice * product.quantity,
+      0
+    );
+
+    // Email message
+    const emailMessage = {
+      text: `Order ID: ${orderId}\n\nOrder Details:\n${order.products
+        .map(
+          (product) =>
+            `${product.packageName}: $${product.packagePrice} x ${product.quantity}`
+        )
+        .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(2)}\nPayment Method: PayPal`,
+      from: process.env.EMAIL_USER,
+      to: order.email, // Send to customer (change as needed to send to admin)
+      subject: `Order Completed: ${orderId}`,
+      attachment: [
+        {
+          data: `
+            <h2>Order Completed</h2>
+            <p><strong>Order ID:</strong> ${orderId}</p>
+            <p>Order Details:</p>
+            ${productDetails}
+            <p><strong>Total Price: $${totalPrice.toFixed(2)}</strong></p>
+            <p><strong>Payment Method: PayPal</strong></p>
+          `,
+          alternative: true,
+        },
+      ],
+    };
+
+    // Send the email using emailjs
+    client.send(emailMessage, (err, message) => {
+      if (err) {
+        console.error('Error sending email:', err);
+      } else {
+        console.log('Email sent successfully:', message);
+      }
+    });
+
+    res.json({ message: 'Order completed and email sent', orderDetails: order });
+  } catch (err) {
+    console.error('Error updating order status:', err);
+    res.status(500).json({ message: 'Failed to update order status' });
+  }
+});
+
 
 // Start the server
 app.listen(port, () => {
