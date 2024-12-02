@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 const app = express();
  // Fallback to 9000 if PORT is not defined
-
+const port = process.env.Port||8080
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
