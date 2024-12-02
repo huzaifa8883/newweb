@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');  // Import the cors package
 const app = express();
-const port = 9000;
+const port = process.env.Port;
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
