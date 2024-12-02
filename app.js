@@ -166,6 +166,17 @@ app.get('/orders', async (req, res) => {
   }
 });
 
+app.get('/orders/:orderId', (req, res) => {
+  const orderId = req.params.orderId;
+  const order = Order.find(order => order._id === orderId); // Find order by orderId
+
+  if (order) {
+      res.json({ order });
+  } else {
+      res.status(404).send({ message: 'Order not found' });
+  }
+});
+
 // Route to update the payment status of an order
 app.post('/update-order-status', async (req, res) => {
   const { orderId, paymentStatus } = req.body;
@@ -300,7 +311,7 @@ app.post('/complete-order', async (req, res) => {
         )
         .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(2)}\nPayment Method: PayPal`,
       from: process.env.EMAIL_USER,
-      to: order.email, // Send to customer (change as needed to send to admin)
+      to: process.env.EMAIL_USER, // Send to customer (change as needed to send to admin)
       subject: `Order Completed: ${orderId}`,
       attachment: [
         {
