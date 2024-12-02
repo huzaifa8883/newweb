@@ -1,11 +1,11 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const mongoose = require('mongoose');
-const cors = require('cors');  // Import the cors package
+import express from 'express';
+import bodyParser from 'body-parser';
+import mongoose from 'mongoose';
+import cors from 'cors';
+import { SMTPClient } from 'emailjs';
+import dotenv from 'dotenv';
+dotenv.config();
 const app = express();
-const { SMTPClient } = require('emailjs'); // Import emailjs
-require('dotenv').config();
-
  // Fallback to 9000 if PORT is not defined
 
 // Middleware to parse JSON bodies
