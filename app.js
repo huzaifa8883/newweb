@@ -87,7 +87,7 @@ app.post('/submit-checkout', (req, res) => {
       const totalPrice = products.reduce((total, product) => total + product.packagePrice * product.quantity, 0);
       
       const mailOptions = {
-        from: 'hadershalihuzaifa@gmail.com',
+        from: process.env.EMAIL_USER,
         to: email, // Send the email to the customer's email address
         subject: 'Thank You for Your Order!',
         html: `
