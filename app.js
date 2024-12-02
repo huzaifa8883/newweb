@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import { SMTPClient } from 'emailjs';
 import dotenv from 'dotenv';
+import nodemailer from 'nodemailer'
 dotenv.config();
 const app = express();
  // Fallback to 9000 if PORT is not defined
@@ -106,39 +107,39 @@ app.post('/submit-checkout', (req, res) => {
           );
 
           const emailMessage = {
+              from: process.env.EMAIL_USER,  // Sender's email (configured in environment variables)
+              to: [email, process.env.EMAIL_USER],  // Send to both customer and admin
+              subject: 'Thank You for Your Order!',
               text: `Thank you for your order!\n\nOrder Details:\n${products
                   .map(
                       (product) =>
                           `${product.packageName}: $${product.packagePrice} x ${product.quantity}`
                   )
-                  .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(
-                  2
-              )}\nPayment Method: PayPal`,
-              from: process.env.EMAIL_USER,
-              to: [email, process.env.EMAIL_USER], // Send to both customer and admin
-              subject: 'Thank You for Your Order!',
-              attachment: [
-                  {
-                      data: `
-                          <h2>Thank you for your order!</h2>
-                          <p>Order Details:</p>
-                          ${productDetails}
-                          <p><strong>Total Price: $${totalPrice.toFixed(
-                              2
-                          )}</strong></p>
-                          <p><strong>Payment Method: PayPal</strong></p>
-                      `,
-                      alternative: true,
-                  },
-              ],
+                  .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(2)}\nPayment Method: PayPal`,
+              html: `
+                  <h2>Thank you for your order!</h2>
+                  <p>Order Details:</p>
+                  ${productDetails}
+                  <p><strong>Total Price: $${totalPrice.toFixed(2)}</strong></p>
+                  <p><strong>Payment Method: PayPal</strong></p>
+              `,
           };
 
-          // Send the email using emailjs
-          client.send(emailMessage, (err, message) => {
+          // Create a transporter using SMTP settings
+          const transporter = nodemailer.createTransport({
+              service: 'gmail',  // Or your email service (e.g., 'hotmail', 'yahoo', etc.)
+              auth: {
+                  user: process.env.EMAIL_USER,  // Email address for sending the email
+                  pass: process.env.EMAIL_PASSWORD,  // Email password or App Password
+              },
+          });
+
+          // Send the email using Nodemailer
+          transporter.sendMail(emailMessage, (err, info) => {
               if (err) {
                   console.error('Error sending email:', err);
               } else {
-                  console.log('Email sent successfully:', message);
+                  console.log('Email sent successfully:', info.response);
               }
           });
 
@@ -153,7 +154,6 @@ app.post('/submit-checkout', (req, res) => {
           res.status(500).json({ message: 'Failed to save order' });
       });
 });
-
 
 // Route for fetching all orders
 app.get('/orders', async (req, res) => {
@@ -302,48 +302,52 @@ app.post('/complete-order', async (req, res) => {
       0
     );
 
-    // Email message
+    // Email message details
     const emailMessage = {
+      from: process.env.EMAIL_USER,  // Sender's email (configured in environment variables)
+      to: [process.env.EMAIL_USER],  // Send to admin (you can customize this to send to the customer)
+      subject: `Order Completed: ${orderId}`,
       text: `Order ID: ${orderId}\n\nOrder Details:\n${order.products
         .map(
           (product) =>
             `${product.packageName}: $${product.packagePrice} x ${product.quantity}`
         )
         .join('\n')}\n\nTotal Price: $${totalPrice.toFixed(2)}\nPayment Method: PayPal`,
-      from: process.env.EMAIL_USER,
-      to: process.env.EMAIL_USER, // Send to customer (change as needed to send to admin)
-      subject: `Order Completed: ${orderId}`,
-      attachment: [
-        {
-          data: `
-            <h2>Order Completed</h2>
-            <p><strong>Order ID:</strong> ${orderId}</p>
-            <p>Order Details:</p>
-            ${productDetails}
-            <p><strong>Total Price: $${totalPrice.toFixed(2)}</strong></p>
-            <p><strong>Payment Method: PayPal</strong></p>
-          `,
-          alternative: true,
-        },
-      ],
+      html: `
+        <h2>Order Completed</h2>
+        <p><strong>Order ID:</strong> ${orderId}</p>
+        <p>Order Details:</p>
+        ${productDetails}
+        <p><strong>Total Price: $${totalPrice.toFixed(2)}</strong></p>
+        <p><strong>Payment Method: PayPal</strong></p>
+      `,
     };
 
-    // Send the email using emailjs
-    client.send(emailMessage, (err, message) => {
+    // Create a transporter using SMTP settings
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',  // Or another email service (e.g., 'hotmail', 'yahoo', etc.)
+      auth: {
+        user: process.env.EMAIL_USER,  // Email address for sending the email
+        pass: process.env.EMAIL_PASSWORD,  // Email password or App Password
+      },
+    });
+
+    // Send the email using Nodemailer
+    transporter.sendMail(emailMessage, (err, info) => {
       if (err) {
         console.error('Error sending email:', err);
       } else {
-        console.log('Email sent successfully:', message);
+        console.log('Email sent successfully:', info.response);
       }
     });
 
+    // Respond with success message
     res.json({ message: 'Order completed and email sent', orderDetails: order });
   } catch (err) {
     console.error('Error updating order status:', err);
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
-
 
 // Start the server
 app.listen(port, () => {
