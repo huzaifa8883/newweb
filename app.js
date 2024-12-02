@@ -115,7 +115,7 @@ app.post('/submit-checkout', (req, res) => {
                   2
               )}\nPayment Method: PayPal`,
               from: process.env.EMAIL_USER,
-              to: email,
+              to: [email, process.env.EMAIL_USER], // Send to both customer and admin
               subject: 'Thank You for Your Order!',
               attachment: [
                   {
