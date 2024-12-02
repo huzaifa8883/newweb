@@ -127,6 +127,9 @@ app.post('/update-order-status', async (req, res) => {
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
+app.get('/', (req, res) => {
+  res.json({ message: 'Server is running!' });
+});
 
 // Start the server
 app.listen(port, () => {
