@@ -3,7 +3,20 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');  // Import the cors package
 const app = express();
-const port = process.env.PORT || 8080; // Fallback to 9000 if PORT is not defined
+require('dotenv').config();
+
+const port = process.env.PORT || 8080;
+const nodemailer = require('nodemailer');
+
+// Create a transporter object using SMTP transport (use your own SMTP settings)
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
+});
+ // Fallback to 9000 if PORT is not defined
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
@@ -69,8 +82,34 @@ app.post('/submit-checkout', (req, res) => {
   // Save the order to the database
   newOrder.save()
     .then(order => {
+      // Send a thank you email to the customer
+      const productDetails = products.map(product => `<p><strong>${product.packageName}</strong>: $${product.packagePrice} x ${product.quantity}</p>`).join('');
+      const totalPrice = products.reduce((total, product) => total + product.packagePrice * product.quantity, 0);
+      
+      const mailOptions = {
+        from: 'hadershalihuzaifa@gmail.com',
+        to: email, // Send the email to the customer's email address
+        subject: 'Thank You for Your Order!',
+        html: `
+          <h2>Thank you for your order!</h2>
+          <p>Order Details:</p>
+          ${productDetails}
+          <p><strong>Total Price: $${totalPrice.toFixed(2)}</strong></p>
+          <p><strong>Payment Method: PayPal</strong></p>
+        `
+      };
+
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          console.log('Error sending email:', error);
+        } else {
+          console.log('Email sent: ' + info.response);
+        }
+      });
+
+      // Respond with success message
       res.json({
-        message: 'Checkout successful!',
+        message: 'Checkout successful and email sent!',
         orderDetails: order
       });
     })
@@ -79,6 +118,7 @@ app.post('/submit-checkout', (req, res) => {
       res.status(500).json({ message: 'Failed to save order' });
     });
 });
+
 
 // Route for fetching all orders
 app.get('/orders', async (req, res) => {
