@@ -3,7 +3,7 @@ const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
 const cors = require('cors');  // Import the cors package
 const app = express();
-const port = process.env.PORT || 9000; // Fallback to 9000 if PORT is not defined
+const port = process.env.PORT || 8080; // Fallback to 9000 if PORT is not defined
 
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
