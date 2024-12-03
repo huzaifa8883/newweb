@@ -18,8 +18,7 @@ app.use(cors());
 
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://website:huzaifa56567@cluster0.neu99.mongodb.net', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
+
 }).then(() => {
   console.log('Connected to MongoDB');
 }).catch(err => {
