@@ -5,6 +5,7 @@ import cors from 'cors';
 import { SMTPClient } from 'emailjs';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer'
+import fetch from "node-fetch"
 dotenv.config();
 const app = express();
  // Fallback to 9000 if PORT is not defined
@@ -354,38 +355,86 @@ app.post('/complete-order', async (req, res) => {
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
-app.post('/payment-notification', (req, res) => {
-  const { email, totalPrice, products } = req.body;
+app.post('/payment-notification', async (req, res) => {
+  const { txn_id, email, paymentStatus, totalPrice, products } = req.body; // Ensure txn_id exists
+  const orderId = req.body.orderId; // Assuming orderId is sent with the notification
 
-  // Email content
-  const mailOptions = {
-    from: 'hadershalihuzaifa@gmail.com',
-    to: "hadershalihuzaifa@gmail.com", // Customer's email or your notification email
-    subject: 'Payment Received',
-    html: `
-      <h2>Payment Confirmation</h2>
-      <p>Thank you for your payment of $${totalPrice.toFixed(2)}.</p>
-      <h3>Order Details:</h3>
-      <ul>
-        ${products.map(
-          (product) =>
-            `<li>${product.packageName} - $${product.packagePrice} x ${product.quantity}</li>`
-        ).join('')}
-      </ul>
-    `,
-  };
+  try {
+    // Validate PayPal Notification (if applicable)
+    const isPayPalNotification = txn_id !== undefined;
 
-  // Send the email
-  transporter.sendMail(mailOptions, (error, info) => {
-    if (error) {
-      console.error('Error sending email:', error);
-      res.status(500).send('Error sending email');
-    } else {
-      console.log('Email sent:', info.response);
-      res.status(200).send('Payment notification sent');
+    if (isPayPalNotification) {
+      const paypalVerification = await fetch('https://ipnpb.paypal.com/cgi-bin/webscr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `cmd=_notify-validate&${new URLSearchParams(req.body).toString()}`,
+      });
+
+      const verification = await paypalVerification.text();
+
+      if (verification !== 'VERIFIED') {
+        console.error('PayPal verification failed:', verification);
+        return res.status(400).send('Invalid payment notification');
+      }
+
+      console.log('PayPal payment verified:', req.body);
     }
-  });
+
+    // Update Payment Status in MongoDB
+    const updatedOrder = await Order.findOneAndUpdate(
+      { _id: orderId }, // Match order by its ID
+      { 
+        paymentStatus: 'completed', // Set paymentStatus to 'completed'
+        paymentDetails: {           // Optional: Store payment details
+          transactionId: txn_id,
+          totalPaid: totalPrice,
+          paymentMethod: 'PayPal',  // Replace with the actual payment method
+        },
+      },
+      { new: true } // Return the updated document
+    );
+
+    if (!updatedOrder) {
+      console.error('Order not found:', orderId);
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    console.log('Order payment status updated:', updatedOrder);
+
+    // Optionally, send an email confirmation
+    const mailOptions = {
+      from: 'hadershalihuzaifa@gmail.com',
+      to: email || 'hadershalihuzaifa@gmail.com', // Fallback to admin email
+      subject: 'Payment Confirmation',
+      html: `
+        <h2>Payment Received</h2>
+        <p>Thank you for your payment of $${parseFloat(totalPrice).toFixed(2)}.</p>
+        <h3>Order Details:</h3>
+        <ul>
+          ${(products || []).map(
+            (product) =>
+              `<li>${product.packageName} - $${product.packagePrice} x ${product.quantity}</li>`
+          ).join('')}
+        </ul>
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error('Error sending email:', error);
+      } else {
+        console.log('Email sent:', info.response);
+      }
+    });
+
+    // Respond with success
+    res.status(200).json({ message: 'Payment status updated', updatedOrder });
+  } catch (err) {
+    console.error('Error handling payment notification:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
