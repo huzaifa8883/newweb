@@ -12,6 +12,13 @@ const port = process.env.Port||8080
 // Middleware to parse JSON bodies
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+const transporter = nodemailer.createTransport({
+  service: 'Gmail', // Use your email provider
+  auth: {
+    user: 'hadershalihuzaifa@gmail.com',
+    pass: 'wpdx stuz tris qgdt',
+  },
+});
 
 // Enable CORS for a specific origin
 app.use(cors()); 
@@ -347,7 +354,38 @@ app.post('/complete-order', async (req, res) => {
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
+app.post('/payment-notification', (req, res) => {
+  const { email, totalPrice, products } = req.body;
 
+  // Email content
+  const mailOptions = {
+    from: 'hadershalihuzaifa@gmail.com',
+    to: "hadershalihuzaifa@gmail.com", // Customer's email or your notification email
+    subject: 'Payment Received',
+    html: `
+      <h2>Payment Confirmation</h2>
+      <p>Thank you for your payment of $${totalPrice.toFixed(2)}.</p>
+      <h3>Order Details:</h3>
+      <ul>
+        ${products.map(
+          (product) =>
+            `<li>${product.packageName} - $${product.packagePrice} x ${product.quantity}</li>`
+        ).join('')}
+      </ul>
+    `,
+  };
+
+  // Send the email
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.error('Error sending email:', error);
+      res.status(500).send('Error sending email');
+    } else {
+      console.log('Email sent:', info.response);
+      res.status(200).send('Payment notification sent');
+    }
+  });
+});
 // Start the server
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
