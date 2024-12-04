@@ -28,7 +28,7 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
 };
 
-
+app.use(cors(corsOptions));
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://website:huzaifa56567@cluster0.neu99.mongodb.net', {
 
