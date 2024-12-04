@@ -22,13 +22,9 @@ const transporter = nodemailer.createTransport({
 });
 
 // Enable CORS for a specific origin
-const corsOptions = {
-  origin: 'https://automotivehistorychecks.com', // Allow only this domain
-  methods: 'GET,POST,PUT,DELETE', // Specify allowed methods
-  allowedHeaders: ['Content-Type', 'Authorization'], // Specify allowed headers
-};
 
-app.use(cors(corsOptions));
+
+app.use(cors());
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://website:huzaifa56567@cluster0.neu99.mongodb.net', {
 
