@@ -17,7 +17,7 @@ const transporter = nodemailer.createTransport({
   service: 'Gmail', // Use your email provider
   auth: {
     user: 'hadershalihuzaifa@gmail.com',
-    pass: 'wpdx stuz tris qgdt',
+    pass: 'xvqb abnp dxbc vsef',
   },
 });
 
@@ -202,9 +202,7 @@ app.post('/update-order-status', async (req, res) => {
   try {
     // Find the order by ID
     const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found.' });
-    }
+    
 
     // If the payment status is updated to 'completed', send an email
     if (paymentStatus.toLowerCase() === 'completed') {
