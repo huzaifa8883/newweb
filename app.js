@@ -355,97 +355,63 @@ app.post('/complete-order', async (req, res) => {
   }
 });
 app.post('/payment-notification', async (req, res) => {
-  const { txn_id, email, paymentStatus, totalPrice, products, orderId } = req.body;
+  const { txn_id, paymentStatus, totalPrice, orderId } = req.body;
 
   // Ensure required fields are present
   if (!txn_id || !orderId || !totalPrice || !paymentStatus) {
-    console.error('Missing required fields:', req.body);
-    return res.status(400).send('Missing required fields');
+    return res.status(400).json({ message: 'Missing required fields' });
   }
 
   try {
-    // Log received orderId for debugging
-    console.log('Received orderId:', orderId);
-
-    // Convert orderId to ObjectId if necessary
-    
-    const ObjectId = mongoose.Types.ObjectId;
-    const orderObjectId = ObjectId(orderId);
-
-    // Validate PayPal Notification (if applicable)
-    const isPayPalNotification = txn_id !== undefined;
-
-    if (isPayPalNotification) {
-      const paypalVerification = await fetch('https://ipnpb.paypal.com/cgi-bin/webscr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `cmd=_notify-validate&${new URLSearchParams(req.body).toString()}`,
-      });
-      
-      const verification = await paypalVerification.text();
-      
-      if (verification !== 'VERIFIED') {
-        console.error('PayPal verification failed:', verification);
-        return res.status(400).send('Invalid payment notification');
-      }
-      
-      console.log('PayPal payment verified:', req.body);
+    // Verify PayPal IPN
+    const verification = await verifyPayPalNotification(req.body);
+    if (!verification) {
+      return res.status(400).json({ message: 'Invalid payment notification' });
     }
 
-    // Update Payment Status in MongoDB
+    // Find the order in the database
+    const order = await Order.findOne({ _id: orderId });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    // Check if the payment status is already completed
+    if (order.paymentStatus === 'completed') {
+      console.log('Payment already completed for this order:', orderId);
+      return res.status(200).json({ message: 'Payment already completed', order });
+    }
+
+    // If paymentStatus is 'pending', we update it to 'completed'
     const updatedOrder = await Order.findOneAndUpdate(
-      { _id: orderObjectId }, // Use ObjectId here
-      { 
-        paymentStatus: paymentStatus || 'completed', // Set paymentStatus to 'completed' or provided status
-        paymentDetails: { // Optional: Store payment details
+      { _id: orderId },
+      {
+        paymentStatus: 'completed', // Set paymentStatus to 'completed'
+        paymentDetails: {
           transactionId: txn_id,
           totalPaid: totalPrice,
-          paymentMethod: 'PayPal', // Replace with the actual payment method
+          paymentMethod: 'PayPal',
         },
       },
-      { new: true } // Return the updated document
+      { new: true }
     );
 
     if (!updatedOrder) {
-      console.error('Order not found:', orderId);
-      return res.status(404).json({ message: 'Order not found' });
+      return res.status(404).json({ message: 'Order not found after update' });
     }
 
     console.log('Order payment status updated:', updatedOrder);
 
-    // Optionally, send an email confirmation
-    const mailOptions = {
-      from: 'hadershalihuzaifa@gmail.com',
-      to: email || 'hadershalihuzaifa@gmail.com', // Fallback to admin email if no email is provided
-      subject: 'Payment Confirmation',
-      html: `
-        <h2>Payment Received</h2>
-        <p>Thank you for your payment of $${parseFloat(totalPrice).toFixed(2)}.</p>
-        <h3>Order Details:</h3>
-        <ul>
-          ${(products || []).map(
-            (product) =>
-              `<li>${product.packageName} - $${product.packagePrice} x ${product.quantity}</li>`
-          ).join('')}
-        </ul>
-      `,
-    };
+    // Optionally, send confirmation email here
+    // ... Email logic ...
 
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error('Error sending email:', error);
-      } else {
-        console.log('Email sent:', info.response);
-      }
-    });
-
-    // Respond with success
-    res.status(200).json({ message: 'Payment status updated', updatedOrder });
+    return res.status(200).json({ message: 'Payment status updated successfully', order: updatedOrder });
   } catch (err) {
     console.error('Error handling payment notification:', err);
-    res.status(500).json({ message: 'Internal server error' });
+    return res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 
 // Start the server
