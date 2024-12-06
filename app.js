@@ -185,6 +185,19 @@ app.get('/orders/:orderId', (req, res) => {
   }
 });
 
+app.get('/get-order-status/:orderId', (req, res) => {
+  const orderId = req.params.orderId;
+
+  // Retrieve the order from your database (this is just a mockup)
+  const order = Order[orderId];
+
+  if (order) {
+    res.json({ paymentStatus: order.paymentStatus });
+  } else {
+    res.status(404).json({ error: 'Order not found' });
+  }
+});
+
 // Route to update the payment status of an order
 app.post('/update-order-status', async (req, res) => {
   const { orderId, paymentStatus } = req.body;
@@ -363,7 +376,7 @@ app.post('/payment-notification', async (req, res) => {
   }
 
   try {
-    // Verify PayPal IPN
+    // Verify PayPal IPN (you can implement this function as needed)
     const verification = await verifyPayPalNotification(req.body);
     if (!verification) {
       return res.status(400).json({ message: 'Invalid payment notification' });
@@ -402,8 +415,23 @@ app.post('/payment-notification', async (req, res) => {
 
     console.log('Order payment status updated:', updatedOrder);
 
-    // Optionally, send confirmation email here
-    // ... Email logic ...
+    // Send confirmation email
+   
+
+    const mailOptions = {
+      from: 'hadershalihuzaifa@gmail.com',  // Replace with your email
+      to: order.email||"hadershalihuzaifa@gmail.com",       // Email of the customer from the order
+      subject: 'Payment Confirmation',
+      text: `Dear ${order.customerName},\n\nYour payment of $${totalPrice} for order #${orderId} has been successfully completed. Your order status is now "Completed".\n\nThank you for your purchase!\n\nBest regards,\nYour Company Name`,
+    };
+
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.log('Error sending email:', error);
+      } else {
+        console.log('Email sent:', info.response);
+      }
+    });
 
     return res.status(200).json({ message: 'Payment status updated successfully', order: updatedOrder });
   } catch (err) {
