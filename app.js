@@ -355,10 +355,23 @@ app.post('/complete-order', async (req, res) => {
   }
 });
 app.post('/payment-notification', async (req, res) => {
-  const { txn_id, email, paymentStatus, totalPrice, products } = req.body; // Ensure txn_id exists
-  const orderId = req.body.orderId; // Assuming orderId is sent with the notification
+  const { txn_id, email, paymentStatus, totalPrice, products, orderId } = req.body;
+
+  // Ensure required fields are present
+  if (!txn_id || !orderId || !totalPrice || !paymentStatus) {
+    console.error('Missing required fields:', req.body);
+    return res.status(400).send('Missing required fields');
+  }
 
   try {
+    // Log received orderId for debugging
+    console.log('Received orderId:', orderId);
+
+    // Convert orderId to ObjectId if necessary
+    
+    const ObjectId = mongoose.Types.ObjectId;
+    const orderObjectId = ObjectId(orderId);
+
     // Validate PayPal Notification (if applicable)
     const isPayPalNotification = txn_id !== undefined;
 
@@ -368,26 +381,26 @@ app.post('/payment-notification', async (req, res) => {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `cmd=_notify-validate&${new URLSearchParams(req.body).toString()}`,
       });
-
+      
       const verification = await paypalVerification.text();
-
+      
       if (verification !== 'VERIFIED') {
         console.error('PayPal verification failed:', verification);
         return res.status(400).send('Invalid payment notification');
       }
-
+      
       console.log('PayPal payment verified:', req.body);
     }
 
     // Update Payment Status in MongoDB
     const updatedOrder = await Order.findOneAndUpdate(
-      { _id: orderId }, // Match order by its ID
+      { _id: orderObjectId }, // Use ObjectId here
       { 
-        paymentStatus: 'completed', // Set paymentStatus to 'completed'
-        paymentDetails: {           // Optional: Store payment details
+        paymentStatus: paymentStatus || 'completed', // Set paymentStatus to 'completed' or provided status
+        paymentDetails: { // Optional: Store payment details
           transactionId: txn_id,
           totalPaid: totalPrice,
-          paymentMethod: 'PayPal',  // Replace with the actual payment method
+          paymentMethod: 'PayPal', // Replace with the actual payment method
         },
       },
       { new: true } // Return the updated document
@@ -403,7 +416,7 @@ app.post('/payment-notification', async (req, res) => {
     // Optionally, send an email confirmation
     const mailOptions = {
       from: 'hadershalihuzaifa@gmail.com',
-      to: email || 'hadershalihuzaifa@gmail.com', // Fallback to admin email
+      to: email || 'hadershalihuzaifa@gmail.com', // Fallback to admin email if no email is provided
       subject: 'Payment Confirmation',
       html: `
         <h2>Payment Received</h2>
@@ -433,6 +446,7 @@ app.post('/payment-notification', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
 
 // Start the server
 app.listen(port, () => {
