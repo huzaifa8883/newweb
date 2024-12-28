@@ -33,7 +33,29 @@ mongoose.connect('mongodb+srv://website:huzaifa56567@cluster0.neu99.mongodb.net'
 }).catch(err => {
   console.error('MongoDB connection error:', err);
 });
+const dataschema = new mongoose.Schema({
+  vinnumber:String,
+  email:String
+})
+const Data = mongoose.model('Data',dataschema)
+app.post('/submit-data',async(req,res)=>{
+  const {vinnumber,email} = req.body;
+  const newdata = new Data({
+    vinnumber,
+    email
+  })
+  newdata.save().then((data)=>{
+    res.json({message:"Data saved"})
+  }).catch((err)=>{
+    console.error('Error saving data:', err);
+    res.status(500).json({ message: 'Failed to save data' });
+  })
+})
+app.get("/get-data",async(req,res)=>{
+  const data = await Data.find()
+  res.json({data})
 
+})
 // Create a Schema for Order Data
 const orderSchema = new mongoose.Schema({
   firstName: String,
